@@ -828,6 +828,14 @@ config ULTRA32
 	  To compile this driver as a module, choose M here. The module
 	  will be called smc-ultra32.
 
+config OPEN_ETH
+	tristate "OpenCores Ethernet support"
+	default y
+	depends on NET_ETHERNET && PLAT_MILKYMIST
+	help
+	  This is the driver for ethmac from OpenCores, used as an early Ethernet
+	  controller in Milkymist with slight modifications.
+
 config BFIN_MAC
 	tristate "Blackfin on-chip MAC support"
 	depends on NET_ETHERNET && (BF516 || BF518 || BF526 || BF527 || BF536 || BF537)
