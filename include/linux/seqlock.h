@@ -85,16 +85,8 @@ static inline int write_tryseqlock(seqlock_t *sl)
 /* Start of read calculation -- fetch last complete writer token */
 static __always_inline unsigned read_seqbegin(const seqlock_t *sl)
 {
-	unsigned ret;
-
-repeat:
-	ret = sl->sequence;
+	unsigned ret = sl->sequence;
 	smp_rmb();
-	if (unlikely(ret & 1)) {
-		cpu_relax();
-		goto repeat;
-	}
-
 	return ret;
 }
 
@@ -128,15 +120,8 @@ typedef struct seqcount {
 /* Start of read using pointer to a sequence counter only.  */
 static inline unsigned read_seqcount_begin(const seqcount_t *s)
 {
-	unsigned ret;
-
-repeat:
-	ret = s->sequence;
+	unsigned ret = s->sequence;
 	smp_rmb();
-	if (unlikely(ret & 1)) {
-		cpu_relax();
-		goto repeat;
-	}
 	return ret;
 }
 
