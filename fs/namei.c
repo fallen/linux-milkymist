@@ -1656,7 +1656,7 @@ static struct file *do_last(struct nameidata *nd, struct path *path,
 		if (path->dentry->d_inode->i_op->follow_link)
 			return NULL;
 		error = -ENOTDIR;
-		if (*want_dir & !path->dentry->d_inode->i_op->lookup)
+		if (*want_dir && !path->dentry->d_inode->i_op->lookup)
 			goto exit_dput;
 		path_to_nameidata(path, nd);
 		audit_inode(pathname, nd->path.dentry);
@@ -2544,7 +2544,7 @@ SYSCALL_DEFINE2(link, const char __user *, oldname, const char __user *, newname
  *	e) conversion from fhandle to dentry may come in the wrong moment - when
  *	   we are removing the target. Solution: we will have to grab ->i_mutex
  *	   in the fhandle_to_dentry code. [FIXME - current nfsfh.c relies on
- *	   ->i_mutex on parents, which works but leads to some truely excessive
+ *	   ->i_mutex on parents, which works but leads to some truly excessive
  *	   locking].
  */
 static int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
