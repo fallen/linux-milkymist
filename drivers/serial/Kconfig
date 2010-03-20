@@ -1506,4 +1506,18 @@ config SERIAL_GRLIB_GAISLER_APBUART_CONSOLE
 	help
 	Support for running a console on the GRLIB APBUART
 
+config SERIAL_MILKYMIST
+	bool "Enable Milkymist UART driver"
+	depends on LM32
+	select SERIAL_CORE
+	help
+	  Enable Milkymist UART driver.
+
+config SERIAL_MILKYMIST_CONSOLE
+	bool "Enable Milkymist UART driver as system console"
+	depends on SERIAL_MILKYMIST
+	select SERIAL_CORE_CONSOLE
+	help
+	  Allow to use the Milkymist UART driver as system console.
+
 endmenu

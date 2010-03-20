@@ -2055,6 +2055,16 @@ config FB_XILINX
 	  framebuffer. ML300 carries a 640*480 LCD display on the board,
 	  ML403 uses a standard DB15 VGA connector.
 
+config FB_MILKYMIST
+	bool "Milkymist framebuffer support"
+	depends on (FB = y) && PLAT_MILKYMIST
+	select FB_SYS_FILLRECT
+	select FB_SYS_COPYAREA
+	select FB_SYS_IMAGEBLIT
+	select FB_SYS_FOPS
+	help
+	  Say Y here to enable support for Milkymist RGB Framebuffer
+
 config FB_COBALT
 	tristate "Cobalt server LCD frame buffer support"
 	depends on FB && MIPS_COBALT
