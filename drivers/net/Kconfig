@@ -1984,6 +1984,19 @@ config BCM63XX_ENET
 	  This driver supports the ethernet MACs in the Broadcom 63xx
 	  MIPS chipset family (BCM63XX).
 
+config MILKYMIST_MINIMAC
+	tristate "Milkymist 10/100 Ethernet mini MAC support"
+	depends on NET_ETHERNET && HAS_IOMEM && HAS_DMA
+	select CRC32
+	help
+	  This driver supports the 10/100 Ethernet mini MAC
+
+config DEBUG_MILKYMIST_MINIMAC
+	default y
+	bool "Debug: Enable MILKYMIST_MINIMAC debugging support"
+	depends on MILKYMIST_MINIMAC
+	help
+
 source "drivers/net/fs_enet/Kconfig"
 
 source "drivers/net/octeon/Kconfig"
