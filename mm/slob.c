@@ -66,8 +66,10 @@
 #include <linux/module.h>
 #include <linux/rcupdate.h>
 #include <linux/list.h>
-#include <linux/kmemtrace.h>
 #include <linux/kmemleak.h>
+
+#include <trace/events/kmem.h>
+
 #include <asm/atomic.h>
 
 /*
@@ -639,7 +641,6 @@ void kmem_cache_free(struct kmem_cache *c, void *b)
 	if (unlikely(c->flags & SLAB_DESTROY_BY_RCU)) {
 		struct slob_rcu *slob_rcu;
 		slob_rcu = b + (c->size - sizeof(struct slob_rcu));
-		INIT_RCU_HEAD(&slob_rcu->head);
 		slob_rcu->size = c->size;
 		call_rcu(&slob_rcu->head, kmem_rcu_free);
 	} else {
