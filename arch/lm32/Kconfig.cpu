@@ -33,7 +33,7 @@ endif
 
 config CPU_CLOCK
 	int "CPU Clock [Hz] (integer)"
-	default "83333333"
+	default "80000000"
 
 config MEMORY_START
 	hex "Physical memory start address (hex)"
