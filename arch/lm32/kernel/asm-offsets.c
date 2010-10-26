@@ -130,13 +130,5 @@ int main(void)
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(PT_DTRACE, PT_DTRACE);
 
-	DEFINE(THREAD_SIZE, THREAD_SIZE);
-
-	/* Offsets in thread_info structure */
-	DEFINE(TI_TASK, offsetof(struct thread_info, task));
-	DEFINE(TI_EXECDOMAIN, offsetof(struct thread_info, exec_domain));
-	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
-	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
-
 	return 0;
 }

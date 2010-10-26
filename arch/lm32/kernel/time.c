@@ -99,11 +99,6 @@ void time_init(void)
 	lm32_irq_unmask(IRQ_SYSTMR);
 }
 
-static unsigned long get_time_offset(void)
-{
-	return in_be32((u32 *)CSR_TIMER0_COUNTER)/(cpu_frequency / HZ);
-}
-
 cycles_t get_cycles(void)
 {
 	return lm32_cycles +

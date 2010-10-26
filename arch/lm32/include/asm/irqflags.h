@@ -1,24 +1,6 @@
 #ifndef _LM32_IRQFLAGS_H
 #define _LM32_IRQFLAGS_H
 
-static inline unsigned long arch_local_irq_save(void)
-{
-	unsigned long flags;
-	asm volatile ("rcsr %0, IE\n" : "=r" (flags));
-//	arch_local_irq_disable();
-	return flags;
-}
-
-static inline void arch_local_irq_enable(void)
-{
-	unsigned int ie;
-	asm volatile (
-		"rcsr %0, IE\n"
-		"ori %0, %0, 1\n"
-		"wcsr IE, %0\n"
-		: "=r"(ie));
-}
-
 static inline void arch_local_irq_disable(void)
 {
 	unsigned int old_ie, new_ie;
@@ -31,6 +13,24 @@ static inline void arch_local_irq_disable(void)
 		: "=r"(new_ie), "=r"(old_ie) \
 	);
 	return;
+}
+
+static inline unsigned long arch_local_irq_save(void)
+{
+	unsigned long flags;
+	asm volatile ("rcsr %0, IE\n" : "=r" (flags));
+	arch_local_irq_disable();
+	return flags;
+}
+
+static inline void arch_local_irq_enable(void)
+{
+	unsigned int ie;
+	asm volatile (
+		"rcsr %0, IE\n"
+		"ori %0, %0, 1\n"
+		"wcsr IE, %0\n"
+		: "=r"(ie));
 }
 
 static inline unsigned long arch_local_save_flags(void)
