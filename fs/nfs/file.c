@@ -36,6 +36,7 @@
 #include "internal.h"
 #include "iostat.h"
 #include "fscache.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
@@ -385,6 +386,10 @@ static int nfs_write_begin(struct file *file, struct address_space *mapping,
 		file->f_path.dentry->d_parent->d_name.name,
 		file->f_path.dentry->d_name.name,
 		mapping->host->i_ino, len, (long long) pos);
+
+	pnfs_update_layout(mapping->host,
+			   nfs_file_open_context(file),
+			   IOMODE_RW);
 
 start:
 	/*
@@ -879,6 +884,7 @@ static int nfs_setlease(struct file *file, long arg, struct file_lock **fl)
 	dprintk("NFS: setlease(%s/%s, arg=%ld)\n",
 			file->f_path.dentry->d_parent->d_name.name,
 			file->f_path.dentry->d_name.name, arg);
-
+	if (arg != F_UNLCK)
+		locks_free_lock(*fl);
 	return -EINVAL;
 }
