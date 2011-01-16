@@ -664,8 +664,9 @@ struct block_device {
 	void *			bd_claiming;
 	void *			bd_holder;
 	int			bd_holders;
+	bool			bd_write_holder;
 #ifdef CONFIG_SYSFS
-	struct list_head	bd_holder_list;
+	struct list_head	bd_holder_disks;
 #endif
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
@@ -1065,7 +1066,6 @@ struct lock_manager_operations {
 	int (*fl_grant)(struct file_lock *, struct file_lock *, int);
 	void (*fl_release_private)(struct file_lock *);
 	void (*fl_break)(struct file_lock *);
-	int (*fl_mylease)(struct file_lock *, struct file_lock *);
 	int (*fl_change)(struct file_lock **, int);
 };
 
@@ -1423,6 +1423,7 @@ struct super_block {
 	 * generic_show_options()
 	 */
 	char __rcu *s_options;
+	const struct dentry_operations *s_d_op; /* default d_op for dentries */
 };
 
 extern struct timespec current_fs_time(struct super_block *sb);
@@ -1834,7 +1835,9 @@ struct super_block *sget(struct file_system_type *type,
 			int (*set)(struct super_block *,void *),
 			void *data);
 extern struct dentry *mount_pseudo(struct file_system_type *, char *,
-	const struct super_operations *ops, unsigned long);
+	const struct super_operations *ops,
+	const struct dentry_operations *dops,
+	unsigned long);
 extern void simple_set_mnt(struct vfsmount *mnt, struct super_block *sb);
 
 static inline void sb_mark_dirty(struct super_block *sb)
@@ -2016,7 +2019,6 @@ extern struct block_device *bdgrab(struct block_device *bdev);
 extern void bd_set_size(struct block_device *, loff_t size);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
-extern struct block_device *open_by_devnum(dev_t, fmode_t);
 extern void invalidate_bdev(struct block_device *);
 extern int sync_blockdev(struct block_device *bdev);
 extern struct super_block *freeze_bdev(struct block_device *);
@@ -2047,16 +2049,26 @@ extern const struct file_operations def_fifo_fops;
 extern int ioctl_by_bdev(struct block_device *, unsigned, unsigned long);
 extern int blkdev_ioctl(struct block_device *, fmode_t, unsigned, unsigned long);
 extern long compat_blkdev_ioctl(struct file *, unsigned, unsigned long);
-extern int blkdev_get(struct block_device *, fmode_t);
-extern int blkdev_put(struct block_device *, fmode_t);
-extern int bd_claim(struct block_device *, void *);
-extern void bd_release(struct block_device *);
+extern int blkdev_get(struct block_device *bdev, fmode_t mode, void *holder);
+extern struct block_device *blkdev_get_by_path(const char *path, fmode_t mode,
+					       void *holder);
+extern struct block_device *blkdev_get_by_dev(dev_t dev, fmode_t mode,
+					      void *holder);
+extern int blkdev_put(struct block_device *bdev, fmode_t mode);
 #ifdef CONFIG_SYSFS
-extern int bd_claim_by_disk(struct block_device *, void *, struct gendisk *);
-extern void bd_release_from_disk(struct block_device *, struct gendisk *);
+extern int bd_link_disk_holder(struct block_device *bdev, struct gendisk *disk);
+extern void bd_unlink_disk_holder(struct block_device *bdev,
+				  struct gendisk *disk);
 #else
-#define bd_claim_by_disk(bdev, holder, disk)	bd_claim(bdev, holder)
-#define bd_release_from_disk(bdev, disk)	bd_release(bdev)
+static inline int bd_link_disk_holder(struct block_device *bdev,
+				      struct gendisk *disk)
+{
+	return 0;
+}
+static inline void bd_unlink_disk_holder(struct block_device *bdev,
+					 struct gendisk *disk)
+{
+}
 #endif
 #endif
 
@@ -2092,8 +2104,6 @@ static inline void unregister_chrdev(unsigned int major, const char *name)
 extern const char *__bdevname(dev_t, char *buffer);
 extern const char *bdevname(struct block_device *bdev, char *buffer);
 extern struct block_device *lookup_bdev(const char *);
-extern struct block_device *open_bdev_exclusive(const char *, fmode_t, void *);
-extern void close_bdev_exclusive(struct block_device *, fmode_t);
 extern void blkdev_show(struct seq_file *,off_t);
 
 #else

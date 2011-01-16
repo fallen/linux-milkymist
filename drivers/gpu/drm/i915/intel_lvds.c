@@ -106,7 +106,7 @@ static void intel_lvds_enable(struct intel_lvds *intel_lvds)
 	I915_WRITE(ctl_reg, I915_READ(ctl_reg) | POWER_TARGET_ON);
 	POSTING_READ(lvds_reg);
 
-	intel_panel_set_backlight(dev, dev_priv->backlight_level);
+	intel_panel_enable_backlight(dev);
 }
 
 static void intel_lvds_disable(struct intel_lvds *intel_lvds)
@@ -123,8 +123,7 @@ static void intel_lvds_disable(struct intel_lvds *intel_lvds)
 		lvds_reg = LVDS;
 	}
 
-	dev_priv->backlight_level = intel_panel_get_backlight(dev);
-	intel_panel_set_backlight(dev, 0);
+	intel_panel_disable_backlight(dev);
 
 	I915_WRITE(ctl_reg, I915_READ(ctl_reg) & ~POWER_TARGET_ON);
 
@@ -375,6 +374,10 @@ static bool intel_lvds_mode_fixup(struct drm_encoder *encoder,
 	}
 
 out:
+	if ((pfit_control & PFIT_ENABLE) == 0) {
+		pfit_control = 0;
+		pfit_pgm_ratios = 0;
+	}
 	if (pfit_control != intel_lvds->pfit_control ||
 	    pfit_pgm_ratios != intel_lvds->pfit_pgm_ratios) {
 		intel_lvds->pfit_control = pfit_control;
@@ -397,8 +400,6 @@ static void intel_lvds_prepare(struct drm_encoder *encoder)
 	struct drm_device *dev = encoder->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_lvds *intel_lvds = to_intel_lvds(encoder);
-
-	dev_priv->backlight_level = intel_panel_get_backlight(dev);
 
 	/* We try to do the minimum that is necessary in order to unlock
 	 * the registers for mode setting.
@@ -429,9 +430,6 @@ static void intel_lvds_commit(struct drm_encoder *encoder)
 	struct drm_device *dev = encoder->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_lvds *intel_lvds = to_intel_lvds(encoder);
-
-	if (dev_priv->backlight_level == 0)
-		dev_priv->backlight_level = intel_panel_get_max_backlight(dev);
 
 	/* Undo any unlocking done in prepare to prevent accidental
 	 * adjustment of the registers.
@@ -702,6 +700,14 @@ static const struct dmi_system_id intel_no_lvds[] = {
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AOpen"),
 			DMI_MATCH(DMI_BOARD_NAME, "i915GMx-F"),
+		},
+	},
+	{
+		.callback = intel_no_lvds_dmi_callback,
+		.ident = "AOpen i915GMm-HFS",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AOpen"),
+			DMI_MATCH(DMI_BOARD_NAME, "i915GMm-HFS"),
 		},
 	},
 	{
