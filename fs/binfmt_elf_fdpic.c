@@ -2085,6 +2085,7 @@ cleanup:
 #ifdef ELF_CORE_COPY_FPREGS
 	kfree(fpu);
 #endif
+	kfree(shdr4extnum);
 #ifdef ELF_CORE_COPY_XFPREGS
 	kfree(xfpu);
 #endif
