@@ -293,7 +293,10 @@ strncpy_from_user(char *dst, const char __user *src, long count)
  * Return 0 on exception, a value greater than N if too long
  */
 #ifndef __strnlen_user
-#define __strnlen_user strnlen
+static inline long __strnlen_user(const char __user *src, long n)
+{
+	return strnlen((void * __force)src, n) + 1;
+}
 #endif
 
 static inline long strnlen_user(const char __user *src, long n)
