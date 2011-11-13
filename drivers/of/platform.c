@@ -13,6 +13,7 @@
  */
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/amba/bus.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
@@ -161,7 +162,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
 	}
 
 	dev->dev.of_node = of_node_get(np);
-#if defined(CONFIG_PPC) || defined(CONFIG_MICROBLAZE)
+#if defined(CONFIG_MICROBLAZE)
 	dev->dev.dma_mask = &dev->archdata.dma_mask;
 #endif
 	dev->dev.parent = parent;
@@ -176,17 +177,20 @@ struct platform_device *of_device_alloc(struct device_node *np,
 EXPORT_SYMBOL(of_device_alloc);
 
 /**
- * of_platform_device_create - Alloc, initialize and register an of_device
+ * of_platform_device_create_pdata - Alloc, initialize and register an of_device
  * @np: pointer to node to create device for
  * @bus_id: name to assign device
+ * @platform_data: pointer to populate platform_data pointer with
  * @parent: Linux device model parent device.
  *
  * Returns pointer to created platform device, or NULL if a device was not
  * registered.  Unavailable devices will not get registered.
  */
-struct platform_device *of_platform_device_create(struct device_node *np,
-					    const char *bus_id,
-					    struct device *parent)
+struct platform_device *of_platform_device_create_pdata(
+					struct device_node *np,
+					const char *bus_id,
+					void *platform_data,
+					struct device *parent)
 {
 	struct platform_device *dev;
 
@@ -197,11 +201,12 @@ struct platform_device *of_platform_device_create(struct device_node *np,
 	if (!dev)
 		return NULL;
 
-#if defined(CONFIG_PPC) || defined(CONFIG_MICROBLAZE)
+#if defined(CONFIG_MICROBLAZE)
 	dev->archdata.dma_mask = 0xffffffffUL;
 #endif
 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	dev->dev.bus = &platform_bus_type;
+	dev->dev.platform_data = platform_data;
 
 	/* We do not fill the DMA ops for platform devices by default.
 	 * This is currently the responsibility of the platform code
@@ -215,7 +220,110 @@ struct platform_device *of_platform_device_create(struct device_node *np,
 
 	return dev;
 }
+
+/**
+ * of_platform_device_create - Alloc, initialize and register an of_device
+ * @np: pointer to node to create device for
+ * @bus_id: name to assign device
+ * @parent: Linux device model parent device.
+ *
+ * Returns pointer to created platform device, or NULL if a device was not
+ * registered.  Unavailable devices will not get registered.
+ */
+struct platform_device *of_platform_device_create(struct device_node *np,
+					    const char *bus_id,
+					    struct device *parent)
+{
+	return of_platform_device_create_pdata(np, bus_id, NULL, parent);
+}
 EXPORT_SYMBOL(of_platform_device_create);
+
+#ifdef CONFIG_ARM_AMBA
+static struct amba_device *of_amba_device_create(struct device_node *node,
+						 const char *bus_id,
+						 void *platform_data,
+						 struct device *parent)
+{
+	struct amba_device *dev;
+	const void *prop;
+	int i, ret;
+
+	pr_debug("Creating amba device %s\n", node->full_name);
+
+	if (!of_device_is_available(node))
+		return NULL;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return NULL;
+
+	/* setup generic device info */
+	dev->dev.coherent_dma_mask = ~0;
+	dev->dev.of_node = of_node_get(node);
+	dev->dev.parent = parent;
+	dev->dev.platform_data = platform_data;
+	if (bus_id)
+		dev_set_name(&dev->dev, "%s", bus_id);
+	else
+		of_device_make_bus_id(&dev->dev);
+
+	/* setup amba-specific device info */
+	dev->dma_mask = ~0;
+
+	/* Allow the HW Peripheral ID to be overridden */
+	prop = of_get_property(node, "arm,primecell-periphid", NULL);
+	if (prop)
+		dev->periphid = of_read_ulong(prop, 1);
+
+	/* Decode the IRQs and address ranges */
+	for (i = 0; i < AMBA_NR_IRQS; i++)
+		dev->irq[i] = irq_of_parse_and_map(node, i);
+
+	ret = of_address_to_resource(node, 0, &dev->res);
+	if (ret)
+		goto err_free;
+
+	ret = amba_device_register(dev, &iomem_resource);
+	if (ret)
+		goto err_free;
+
+	return dev;
+
+err_free:
+	kfree(dev);
+	return NULL;
+}
+#else /* CONFIG_ARM_AMBA */
+static struct amba_device *of_amba_device_create(struct device_node *node,
+						 const char *bus_id,
+						 void *platform_data,
+						 struct device *parent)
+{
+	return NULL;
+}
+#endif /* CONFIG_ARM_AMBA */
+
+/**
+ * of_devname_lookup() - Given a device node, lookup the preferred Linux name
+ */
+static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *lookup,
+				 struct device_node *np)
+{
+	struct resource res;
+	if (lookup) {
+		for(; lookup->name != NULL; lookup++) {
+			if (!of_device_is_compatible(np, lookup->compatible))
+				continue;
+			if (of_address_to_resource(np, 0, &res))
+				continue;
+			if (res.start != lookup->phys_addr)
+				continue;
+			pr_debug("%s: devname=%s\n", np->full_name, lookup->name);
+			return lookup;
+		}
+	}
+	return NULL;
+}
 
 /**
  * of_platform_bus_create() - Create a device for a node and its children.
@@ -229,10 +337,14 @@ EXPORT_SYMBOL(of_platform_device_create);
  */
 static int of_platform_bus_create(struct device_node *bus,
 				  const struct of_device_id *matches,
+				  const struct of_dev_auxdata *lookup,
 				  struct device *parent, bool strict)
 {
+	const struct of_dev_auxdata *auxdata;
 	struct device_node *child;
 	struct platform_device *dev;
+	const char *bus_id = NULL;
+	void *platform_data = NULL;
 	int rc = 0;
 
 	/* Make sure it has a compatible property */
@@ -242,13 +354,24 @@ static int of_platform_bus_create(struct device_node *bus,
 		return 0;
 	}
 
-	dev = of_platform_device_create(bus, NULL, parent);
+	auxdata = of_dev_lookup(lookup, bus);
+	if (auxdata) {
+		bus_id = auxdata->name;
+		platform_data = auxdata->platform_data;
+	}
+
+	if (of_device_is_compatible(bus, "arm,primecell")) {
+		of_amba_device_create(bus, bus_id, platform_data, parent);
+		return 0;
+	}
+
+	dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
 	if (!dev || !of_match_node(matches, bus))
 		return 0;
 
 	for_each_child_of_node(bus, child) {
 		pr_debug("   create child: %s\n", child->full_name);
-		rc = of_platform_bus_create(child, matches, &dev->dev, strict);
+		rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);
 		if (rc) {
 			of_node_put(child);
 			break;
@@ -282,11 +405,11 @@ int of_platform_bus_probe(struct device_node *root,
 
 	/* Do a self check of bus type, if there's a match, create children */
 	if (of_match_node(matches, root)) {
-		rc = of_platform_bus_create(root, matches, parent, false);
+		rc = of_platform_bus_create(root, matches, NULL, parent, false);
 	} else for_each_child_of_node(root, child) {
 		if (!of_match_node(matches, child))
 			continue;
-		rc = of_platform_bus_create(child, matches, parent, false);
+		rc = of_platform_bus_create(child, matches, NULL, parent, false);
 		if (rc)
 			break;
 	}
@@ -316,6 +439,7 @@ EXPORT_SYMBOL(of_platform_bus_probe);
  */
 int of_platform_populate(struct device_node *root,
 			const struct of_device_id *matches,
+			const struct of_dev_auxdata *lookup,
 			struct device *parent)
 {
 	struct device_node *child;
@@ -326,7 +450,7 @@ int of_platform_populate(struct device_node *root,
 		return -EINVAL;
 
 	for_each_child_of_node(root, child) {
-		rc = of_platform_bus_create(child, matches, parent, true);
+		rc = of_platform_bus_create(child, matches, lookup, parent, true);
 		if (rc)
 			break;
 	}
