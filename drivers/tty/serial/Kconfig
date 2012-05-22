@@ -1519,7 +1519,7 @@ config SERIAL_MILKYMIST
 	  Enable Milkymist UART driver.
 
 config SERIAL_MILKYMIST_NR_UARTS
-	int "Maximum number of milkymist serial ports"
+	int "Maximum number of Milkymist serial ports"
 	depends on SERIAL_MILKYMIST
 	default "1"
 
